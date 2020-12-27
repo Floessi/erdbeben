@@ -1,0 +1,318 @@
+#############################################################################################################
+# Ergebnisse der Anregungen, Fragen (etc.) der Zwischenpraesentation ########################################
+############################################################################################################
+
+# Packages und Datensatz
+library(ggplot2)
+library(corrplot)
+library(gridExtra)
+library(MASS)
+library(lattice)
+library(pscl)
+library(leaps)
+# Beachte der Datensatz muss "full_data" heissen, damit der Code durchlaeuft
+load("Daten/data_full_00001.Rda")
+
+
+
+
+#############################################################################################################
+# Grafiken, die manche der Fragen abdecken bzw. fuer welche Interesse im Zwischenvortrag entstand ###########
+#############################################################################################################
+# Anteile der Trigger-Beben
+# FALSE: triggert kein Nachbeben
+table(full_data$willTrigger)
+
+plot(density(full_data[!full_data$willTrigger,]$mag, from = 3, to = 9),
+     xlab = "Alter in Jahrezehnten", xlim = c(3, 9), ylim = c(0, 1.7),
+     ylab = "Wahrscheinlichkeitsdichte", main = "Kerndichteschaetzung nach willTrigger")
+lines(density(full_data[full_data$willTrigger,]$mag, from = 3, to =9), col = "red")
+legend(
+  "topright",
+  title = "Triggert Nachbeben",
+  legend = c("Nein", "Ja"),
+  col = c("black", "red"),
+  lty = 1
+)
+
+# Sind die Anteile der Triggerbeben unter verschiedenen Bereichen der Magnitude unterschiedlich
+# Unterteile hierfuer die Magnituden in 4 Level: 4.0-4.9, 5.0-5.9, 6.0-6.9, ab 7.0
+full_data$count <- rep(1, nrow(full_data))
+magType <- character()
+for (i in seq_len(nrow(full_data))) {
+  if (full_data$mag[[i]] >= 4.0 & full_data$mag[[i]] <= 4.9) {
+    magType[[i]] <- "4.0-4.9"
+  }
+  else if (full_data$mag[[i]] >= 5.0 & full_data$mag[[i]] <= 5.9) {
+    magType[[i]] <- "5.0-5.9"
+  }
+  else if (full_data$mag[[i]] >= 6.0 & full_data$mag[[i]] <= 6.9) {
+    magType[[i]] <- "6.0-6.9"
+  }
+  else {
+    magType[[i]] <- "ab 7.0"
+  }
+}
+full_data$magType <- factor(magType, levels = c("4.0-4.9", "5.0-5.9", "6.0-6.9", "ab 7.0"))
+
+AnteileTriggerBeben <- data.frame("keinNachbeben" = c(table(full_data$magType, full_data$willTrigger)[, 1],
+                                                      sum(table(full_data$magType, full_data$willTrigger)[, 1])),
+                                  "TriggerBeben" = c(table(full_data$magType, full_data$willTrigger)[, 2],
+                                                     sum(table(full_data$magType, full_data$willTrigger)[, 2])),
+                                  "Sum" = c(table(full_data$magType), nrow(full_data)),
+                                  row.names = c(levels(full_data$magType), "Sum"))
+AnteileTriggerBeben$relativerAnteil <- round(AnteileTriggerBeben$TriggerBeben/AnteileTriggerBeben$Sum, digits = 2)
+
+ggplot(data = full_data, aes(x = magType, y = count, fill = willTrigger)) +
+  geom_bar(position="fill", stat="identity") + xlab("Magnitude") + ylab("Prozentanteil")
+AnteileTriggerBeben
+
+# Winkel
+ggplot(full_data, aes(x = strike, colour = willTrigger)) + geom_histogram(bins = 50)
+ggplot(full_data, aes(x = dip, colour = willTrigger)) + geom_histogram(bins = 50)
+ggplot(full_data, aes(x = rake, colour = willTrigger)) + geom_histogram(bins = 50)
+
+
+c("Keine Nachbeben" = nrow(full_data[!full_data$willTrigger, ]), "Nachbeben > 0" = nrow(full_data[full_data$willTrigger, ]),
+  "Nachbeben 1-5" = nrow(full_data[full_data$triggerCountTh <= 5 & full_data$triggerCountTh > 0, ]),
+  "Nachbebenanzahl > 5" = nrow(full_data[full_data$triggerCountTh > 5, ]))
+
+grid.arrange(ggplot(full_data[!full_data$willTrigger, ], aes(x = strike)) + geom_density() + ggtitle("Keine Nachbeben"),
+             ggplot(full_data[full_data$triggerCountTh <= 5 & full_data$triggerCountTh > 0, ], aes(x = strike)) + geom_density() + ggtitle("Nachbebenanzahl 1-5"),
+             ggplot(full_data[full_data$willTrigger, ], aes(x = strike)) + geom_density() + ggtitle("Nachbeben > 0"),
+             ggplot(full_data[full_data$triggerCountTh > 5, ], aes(x = strike)) + geom_density() + ggtitle("Nachbebenanzahl > 5"),
+             nrow = 2)
+grid.arrange(ggplot(full_data[!full_data$willTrigger, ], aes(x = dip)) + geom_density() + ggtitle("Keine Nachbeben"),
+             ggplot(full_data[full_data$triggerCountTh <= 5 & full_data$triggerCountTh > 0, ], aes(x = dip)) + geom_density() + ggtitle("Nachbebenanzahl 1-5"),
+             ggplot(full_data[full_data$willTrigger, ], aes(x = dip)) + geom_density() + ggtitle("Nachbeben > 0"),
+             ggplot(full_data[full_data$triggerCountTh > 5, ], aes(x = dip)) + geom_density() + ggtitle("Nachbebenanzahl > 5"),
+             nrow = 2)
+
+grid.arrange(ggplot(full_data[!full_data$willTrigger, ], aes(x = rake)) + geom_density() + ggtitle("Keine Nachbeben"),
+             ggplot(full_data[full_data$triggerCountTh <= 5 & full_data$triggerCountTh > 0, ], aes(x = rake)) + geom_density() + ggtitle("Nachbebenanzahl 1-5"),
+             ggplot(full_data[full_data$willTrigger, ], aes(x = rake)) + geom_density() + ggtitle("Nachbeben > 0"),
+             ggplot(full_data[full_data$triggerCountTh > 5, ], aes(x = rake)) + geom_density() + ggtitle("Nachbebenanzahl > 5"),
+             nrow = 2)
+
+
+
+
+#############################################################################################################
+# Untersuche Korrelationen, Kolinearitaet ###################################################################
+#############################################################################################################
+# Korrelationsmatrizen fuer geographische, physikalische Groessen
+cor(as.matrix(full_data[, c("mag", "heatFlow", "crustalThick", "mantleThick", "elevation", "triggerCountTh")]))
+# Visuell
+corrplot(cor(as.matrix(full_data[, c("mag", "heatFlow", "crustalThick",
+                                     "mantleThick", "elevation", "triggerCountTh")])),
+         type = "upper", order = "hclust", tl.col = "black", tl.srt = 45)
+# heatFlow, crustalThick und elevation sind alle relativ stark positiv miteinander korreliert
+# mantleThcik ist mit allen drei relativ stark negativ korreliert
+# Dickere Mantelschicht => weniger Waerme kommt durch
+# Dickere Mantelschicht => weniger Platz fuer die Krustenschicht
+# Dickere Mantelschicht => warum elevation negativ und nicht positiv korreliert?!
+
+# Korrelationen zur Zielgroesse
+cor(as.matrix(full_data[, c("mag", "depth", "heatFlow", "crustalThick", "mantleThick", "elevation",
+                            "strike", "dip", "rake", "triggerCountTh")]))[, 10]
+
+corrplot::corrplot(cor(full_data[, c("mag", "depth", "heatFlow", "crustalThick", "mantleThick", "elevation",
+                                     "strike", "dip", "rake", "triggerCountTh")]), method = "color", order = "hclust")
+
+vif(model_negbin_1)
+
+#############################################################################################################
+# Zeroinflated negative-binomial-model ######################################################################
+#############################################################################################################
+# Count-Data und der Fakt Var(y)>Mean(y) => negative Binomialverteilung
+# Uebermaessiger Anteil an 0ern => Zero-Inflation
+# Theorie hinter einem Zero-inflated negbin-model:
+# Die Daten (genauer die 0er) entstammen aus zwei verschiedenen "Quellen"
+# Das Erste ist ein Modell (Logit) welches eine 0 zurueckgibt, falls sich die Beobachtung in einer
+# "Certain Zero Group" befindet
+# Das Zweite ist das klassische negative Binomialmodell fuer Count-Data, welche auf die Beobachtungen
+# angewandt wird welche nicht in der "Certain Zero Group" aus dem Logit-Modell sind
+# Gibt es eine theoretische Grundlage fuer das auftreten von Certain Zeros bei Erdbeben (Frage fuer Grimm)
+
+# Normales NegBin Modell
+
+model_negbin_1 <- glm.nb(triggerCountTh ~ mag + depth + heatFlow + crustalThick + mantleThick + elevation +
+                           strike + dip + rake, full_data, link = log)
+summary(model_negbin_1)
+AIC(model_negbin_1)
+BIC(model_negbin_1)
+
+model_negbin_2 <- glm.nb(triggerCountTh ~ mag + depth + heatFlow +
+                           strike + dip + rake, full_data, link = log)
+summary(model_negbin_2)
+AIC(model_negbin_2)
+BIC(model_negbin_2)
+
+# Zeroinflated NegBin Modell
+
+model_zfnegbin_1 <- zeroinfl(triggerCountTh ~ mag + depth + heatFlow + crustalThick + mantleThick +
+                               elevation + strike + dip + rake, full_data, dist = "negbin")
+summary(model_zfnegbin_1)
+AIC(model_zfnegbin_1)
+BIC(model_zfnegbin_1)
+
+model_zfnegbin_2 <- zeroinfl(triggerCountTh ~ mag + depth + heatFlow +
+                               strike + dip + rake, full_data, dist = "negbin")
+summary(model_zfnegbin_2)
+AIC(model_zfnegbin_2)
+BIC(model_zfnegbin_2)
+
+model_zfnegbin_3 <- zeroinfl(triggerCountTh ~ mag + depth + heatFlow + crustalThick + mantleThick +
+                               elevation + strike + dip + rake | mag, full_data, dist = "negbin")
+summary(model_zfnegbin_3)
+AIC(model_zfnegbin_3)
+BIC(model_zfnegbin_3)
+
+model_zfnegbin_4 <- zeroinfl(triggerCountTh ~ mag + I(mag^3) + depth + heatFlow + crustalThick + mantleThick +
+                               elevation + strike + dip + rake | mag, full_data, dist = "negbin")
+summary(model_zfnegbin_4)
+AIC(model_zfnegbin_4)
+BIC(model_zfnegbin_4)
+
+# Schrittweise Variablenselektion
+model_0 <- zeroinfl(triggerCountTh ~ mag | mag, full_data, dist = "negbin")
+summary(model_0)
+
+model_full <- zeroinfl(triggerCountTh ~ mag + depth + heatFlow + crustalThick + mantleThick +
+                      elevation + strike + dip + rake | mag, full_data, dist = "negbin")
+summary(model_full)
+stepAIC(model_0, scope = list(upper = model_full, lower = model_0), direction = c("forward"))
+
+# Nur mit negBin
+model_0_2 <- glm.nb(triggerCountTh ~ mag, full_data)
+summary(model_0_2)
+
+model_full_2 <- glm.nb(triggerCountTh ~ mag + depth + heatFlow + crustalThick + mantleThick +
+                         elevation + strike + dip + rake, full_data)
+summary(model_full_2)
+stepAIC(model_0_2, scope = list(upper = model_full_2, lower = model_0_2), direction = c("forward"))
+stepAIC(model_0_2, scope = list(upper = model_full_2, lower = model_0_2), direction = c("both"))
+
+# Mit leaps-package
+temp <- regsubsets(triggerCountTh ~ mag + I(mag^2) + I((mag > 4.9) * ((mag - 5.0)^2)) + I((mag > 5.9) * ((mag - 6.0)^2)) +
+                     I((mag > 6.9) * ((mag - 7.0)^2)) + depth + heatFlow + crustalThick + mantleThick +
+                     elevation + strike + dip + rake, data = full_data, nvmax = 14)
+
+plot(1:13, summary(temp)$bic, xlab = "Zahl der Variablen", ylab = "Bic")
+
+
+#############################################################################################################
+# Versuche die Magnitude anders einfliessen zu lassen ins Modell ############################################
+#############################################################################################################
+# Scatterplot mit stat_smooth
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point()
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() + xlim(4, 7) +
+  ylim(0, 45)
+
+
+# Plotte die durchschnittliche Nachbebenanzahl gegen die Magnitude
+aggregate(full_data$triggerCountTh,  by = list(magID = full_data$mag), FUN = mean)
+xyplot(x ~ magID,
+       data = aggregate(full_data$triggerCountTh,  by = list(magID = full_data$mag), FUN = mean),
+       type = "l", xlab = "Magnitude", ylab = "Durchschnittliche Nachbebenanzahl",)
+xyplot(x ~ magID,
+       data = aggregate(full_data$triggerCountTh,  by = list(magID = full_data$mag), FUN = mean),
+       type = "l", xlab = "Magnitude", ylab = "Durchschnittliche Nachbebenanzahl",
+        ylim = c(0,100))
+xyplot(x ~ magID,
+       data = aggregate(full_data$triggerCountTh,  by = list(magID = full_data$mag), FUN = mean),
+       type = "l", xlab = "Magnitude", ylab = "Durchschnittliche Nachbebenanzahl",
+       xlim = c(4, 6.4), ylim = c(0,5))
+# Grober
+aggregate(full_data$triggerCountTh,  by = list(magID = full_data$magType), FUN = mean)
+
+
+# Polynome
+m_p_1 <- lm(triggerCountTh ~ mag, full_data)
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
+  stat_smooth(method = "lm", se = TRUE, formula = y ~ x)
+
+m_p_2 <- lm(triggerCountTh ~ mag + I(mag^2), full_data)
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
+  stat_smooth(method = "lm", se = TRUE, formula = y ~ poly(x,2))
+
+m_p_3 <- lm(triggerCountTh ~ mag + I(mag^2) + I(mag^3), full_data)
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
+  stat_smooth(method = "lm", se = TRUE, formula = y ~ poly(x,3))
+
+m_p_4 <- lm(triggerCountTh ~ mag + I(mag^2) + I(mag^3) + I(mag^4), full_data)
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
+  stat_smooth(method = "lm", se = TRUE, formula = y ~ poly(x,4))
+
+m_p_5 <- lm(triggerCountTh ~ mag + I(mag^2) + I(mag^3) + I(mag^4) + I(mag^5), full_data)
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
+  stat_smooth(method = "lm", se = TRUE, formula = y ~ poly(x,5))
+
+m_p_6 <- lm(triggerCountTh ~ mag + I(mag^2) + I(mag^3) + I(mag^4) + I(mag^5) + I(mag^6), full_data)
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
+  stat_smooth(method = "lm", se = TRUE, formula = y ~ poly(x,6))
+
+summary(m_p_1)
+summary(m_p_2)
+summary(m_p_3)
+summary(m_p_4)
+summary(m_p_5)
+summary(m_p_6)
+# Wie bewertet man Overfitting? (Kreuzvalidierung?)
+
+
+
+# Splines 0.ter Ordnung (stueckweise stetig)
+m_s_0_1 <- lm(triggerCountTh ~ I(mag < 6.0) + I(mag >= 6.0), full_data)
+full_data$predicted <- predict(m_s_0_1)
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
+  geom_line(aes(y = predicted), col = "red")
+
+m_s_0_2 <- lm(triggerCountTh ~ I(mag < 5.0) + I(mag >= 5.0 & mag < 6.0) + I(mag >= 6.0 & mag < 7.0), full_data)
+full_data$predicted <- predict(m_s_0_2)
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
+  geom_line(aes(y = predicted), col = "red")
+
+summary(m_s_1)
+summary(m_s_2)
+
+# Stetige Splines
+m_s_1_1 <- lm(triggerCountTh ~ mag + I((mag > 5.9) * (mag - 6.0)), full_data)
+full_data$predicted <- predict(m_s_1_1)
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
+  geom_line(aes(y = predicted), col = "red")
+
+m_s_1_2 <- lm(triggerCountTh ~ mag + I((mag > 4.9) * (mag - 5.0)) + I((mag > 5.9) * (mag - 6.0)) +
+                I((mag > 6.9) * (mag - 7.0)), full_data)
+full_data$predicted <- predict(m_s_1_2)
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
+  geom_line(aes(y = predicted), col = "red")
+
+m_s_1_3 <- lm(triggerCountTh ~ mag + I((mag > 4.9) * (mag - 5.0)) + I((mag > 6.4) * (mag - 6.5)) +
+                I((mag > 7.1) * (mag - 7.2)), full_data)
+full_data$predicted <- predict(m_s_1_3)
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
+  geom_line(aes(y = predicted), col = "red")
+
+m_s_1_4 <- lm(triggerCountTh ~ mag + + I(mag^2) + I((mag > 4.9) * ((mag - 5.0)^2)) + I((mag > 5.9) * ((mag - 6.0)^2)) +
+                I((mag > 6.9) * ((mag - 7.0)^2)), full_data)
+full_data$predicted <- predict(m_s_1_4)
+ggplot(data = full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
+  geom_line(aes(y = predicted), col = "red")
+
+summary(m_s_1_1)
+summary(m_s_1_2)
+summary(m_s_1_3)
+summary(m_s_1_4)
+
+full_data$resid <- full_data$triggerCountTh - full_data$predicted
+plot(resid ~ mag, full_data)
+
+# Polynome und Splines
+m_ps_1 <- lm(triggerCountTh ~ I(mag < 5.0) + I(mag >= 5.0 & mag < 6.0) + I(mag >= 6.0 & mag < 7.0) +
+              I(mag >= 7.0):mag, full_data)
+m_ps_2 <- lm(triggerCountTh ~ I(mag < 5.0) + I(mag >= 5.0 & mag < 6.0) +
+               I(mag >= 6.0 & mag < 7.0):I(mag^2) + I(mag >= 7.0):I(mag^2), full_data)
+
+summary(m_ps_1)
+summary(m_ps_2)
