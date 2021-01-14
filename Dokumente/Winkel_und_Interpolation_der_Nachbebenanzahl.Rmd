@@ -1,0 +1,34 @@
+---
+title: "Interpolation/ Curve-Fitting"
+author: "Erdbeben-Gruppe"
+date: "14 1 2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r , include=FALSE}
+load("C:/Users/Marco/Documents/erdbeben/Daten/data_full_00001.Rda")
+library(ggplot2)
+```
+
+
+Nach der letzen Besprechung haben wir im Anschluss versucht den Einfluss der Magnitude auf die Nachbebenanzahl eines Bebens auf einen exponentiellen Zusammenhang zu interpolieren/fitten. Da bei all unseren bisherigen Ansätzen mit denen wir vertraut waren (Regressionssplines, Polynome allgemein, etc) immer Artefakte der Modellierung aufgetreten sind (wie Bereiche in denen die Kurve nicht mehr steigt oder andere Eigenschaften, die der inhaltlichen Intuition eines exponentiellen Zusammenhangs widersprechen), haben wir uns auf die "Grundfunktion" $a*exp(b*mag)$ beschränkt. Hierbei haben wir jedoch bisher noch keinen sinnvollen Algorithmus in R gefunden, welcher aus unseren Daten eine derartige Exponentialfunktion interpoliert bzw fittet. Unsere Daten für dieses Problem sind:
+
+```{r, fig.height=4}
+# Aggregiere Daten auf durchschnittliche Nachbebenanzahl bezueglich der Magnitude
+interpolation_data <- aggregate(triggerCountTh ~ mag, data = full_data, FUN = mean)
+colnames(interpolation_data) <- c("mag", "avg_afters")
+ggplot(interpolation_data, aes(x = mag, y = avg_afters)) + geom_point() +
+  xlab("Magnitude") + ylab("Durchschnittliche Nachbeben")
+```
+
+
+Da wir bisher in R noch keine Möglichkeit gefunden haben, dieses Problem zu lösen, haben wir auf das Programm Matlab zurückgegriffen. Dieses beinhaltet in der Curve-Fitting-Toolbox einen Algorithmus welcher Daten fittet bezüglich einer gewünschten Zielfunktion. Im folgenden ein Screenshot von diesem Matlab-Algorithmus in den die Daten des vorherigen Codechunks als Input übergeben wurden.
+
+```{r, echo=FALSE, out.width="95%", fig.align="center"}
+knitr::include_graphics("C:/Users/Marco/Documents/erdbeben/Dokumente/Matlab_curve_fitting.jpg")
+```
+Unser Zugriff auf Matlab ist jedoch indirekt über einen Kontakt, was die Reproduzierbarkeit dieses Curve-Fittings einschränkt. Wir hoffen noch auf eine Alternative zu stoßen welche wir selbst in unserem R-Code implementieren können. Vorerst würden wir jedoch unser Modelfitting und unsere Analysen bezüglich des über-/unterdurchschnittlichen Triggerings für den Threshhold $10^{-5}$ anhand der über Matlab erlangten Funktion $8.971*10^{-08}*exp(2.581*mag)$ fortführen.

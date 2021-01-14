@@ -12,9 +12,11 @@ get.data.base <- function() {
   part1 <- read.table("Daten/Urspruengliche_Daten/JapanBosai_mw40_1997enriched.txt", header = TRUE, sep = ";")
   part2 <- read.csv("Daten/Urspruengliche_Daten/201126_strikeDipRake_selection.csv", header = TRUE, sep = ";")
   part3 <- read.csv("Daten/Urspruengliche_Daten/triggerRelations.csv", header = TRUE)
+  part4 <- read.table("Daten/Urspruengliche_Daten/strainRates.txt", sep = ";")
   part1 <- part1[,-c(8, 9, 10, 11, 12, 13)]
   colnames(part3) <- c("distanceMeasure", "triggerID")
-  cbind(part1, part2, part3)
+  colnames(part4) <- "strainRate"
+  cbind(part1, part2, part4, part3)
 }
 
 input_data_base <- get.data.base()
@@ -142,6 +144,24 @@ new.columns2 <- function(input_data) {
     }
   }
 
+  # Kategoriale Variable fuer den triggerCountTh
+  triggerType <- character()
+  for (i in seq_len(nrow(full_data))) {
+    if (full_data$triggerCountTh[[i]] == 0) {
+      triggerType[[i]] <- "0 Nachbeben"
+    }
+    else if (full_data$triggerCountTh[[i]] == 1) {
+      triggerType[[i]] <- "1 Nachbeben"
+    }
+    else if (full_data$triggerCountTh[[i]] >= 2 & full_data$triggerCountTh[[i]] <= 5) {
+      triggerType[[i]] <- "2-5 Nachbeben"
+    }
+    else {
+      triggerType[[i]] <- "6+ Nachbeben"
+    }
+  }
+  resultData$triggerType <- factor(triggerType, levels = c("0 Nachbeben", "1 Nachbeben", "2-5 Nachbeben", "6+ Nachbeben"))
+
   resultData
 }
 
@@ -149,7 +169,37 @@ full_data <- new.columns2(input_data = input_data_columns1)
 
 
 ###################################################################################################
-# Teil 4, zum Daten abspeichern
+# Teil 4, Transformation einiger numerischer Variablen
+###################################################################################################
+
+# Kovariablen die den Zero-inflated NegBin Algorithmen numerische Probleme bereiten
+summary(full_data[, c("crustalThick", "mantleThick", "elevation")])
+# Diese wurden urspruenglich alles in m angegeben, wir transformieren crustal- und mantleThick auf
+# 10km und elevation auf km
+
+full_data$crustalThick <- full_data$crustalThick / 10000
+full_data$mantleThick <- full_data$mantleThick / 10000
+full_data$elevation <- full_data$elevation / 1000
+
+
+###################################################################################################
+# Teil 5, Ueber- oder unterdurchschnittliches Triggering als kategoriale Variable
+###################################################################################################
+# Auf Werten basierend aus dem Matlab Curvefitting-Tool und nur auf Threshold 0.00001 sinnvoll
+trigTrend <- character()
+for (i in seq_len(nrow(full_data))) {
+  if (full_data$triggerCountTh[[i]] > 8.971e-08 * exp(2.581 * full_data$mag[[i]])) {
+    trigTrend[[i]] <- "above_avg"
+  }
+  else {
+    trigTrend[[i]] <- "below_avg"
+  }
+}
+full_data$trigTrend <- factor(trigTrend, levels = c("below_avg", "above_avg"))
+
+
+###################################################################################################
+# Teil 6, zum Daten abspeichern
 ###################################################################################################
 
 # Als Rda
