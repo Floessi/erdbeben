@@ -140,9 +140,9 @@ grid.arrange(ggplot(full_data[!full_data$willTrigger, ], aes(x = rake)) + geom_d
 
 # Ueberdurchschnittliches Triggering, welches ? ##############################################################################
 # Unter allen Beben (Schon ein Nachbeben waere ueberdurchschnittlich)
-mean(full_data[,"triggerCountTh"])
+mean(full_data$triggerCountTh)
 # oder nur unter den Triggerbeben (Ab 3 Nachbeben waere das Triggering ueberdurchschnittlich)
-mean(full_data[full_data$willTrigger,"triggerCountTh"])
+mean(full_data[full_data$willTrigger,]$triggerCountTh)
 
 
 # Zur Veranschaulichung wo die Plattengrenzen liegen #########################################################################
