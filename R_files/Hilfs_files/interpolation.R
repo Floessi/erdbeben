@@ -3,6 +3,11 @@ int_fun_matlab <- function(x) {
   8.971e-08 * exp(2.581 * x)
 }
 
+test_model <- lm(triggerCountTh ~ I(8.971e-08 * exp(2.581 * mag)) - 1, full_data)
+summary(test_model)
+test_model2 <- lm(avg_afters ~ I(8.971e-08 * exp(2.581 * mag)) - 1, interpolation_data)
+summary(test_model2)
+
 
 
 library(ggplot2)
@@ -34,8 +39,10 @@ ggplot(full_data, aes(x = mag, y = triggerCountTh)) + geom_point() + xlim(c(4, 8
 
 # Aggregiere die Daten mit durchschnittlichen Nachbeben bezueglich der Magnitude
 interpolation_data <- aggregate(triggerCountTh ~ mag, data = full_data, FUN = mean)
-colnames(interp_data) <- c("mag", "avg_afters")
-interp_data
+colnames(interpolation_data) <- c("mag", "avg_afters")
+interpolation_data
+
+interp_data <- interpolation_data
 # Geplottet
 ggplot(interp_data, aes(x = mag, y = avg_afters, color = weigth)) + geom_point() +
   scale_color_gradient(low = "yellow", high = "red") + xlab("Magnitude") + ylab("Durchschnittliche Nachbeben")

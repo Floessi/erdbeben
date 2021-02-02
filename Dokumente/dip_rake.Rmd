@@ -1,0 +1,89 @@
+---
+title: "Dip und Rake"
+author: "Erdbeben-Gruppe"
+date: "14 1 2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r , include=FALSE}
+load("C:/Semester_5/Statistisches_Praktikum/R_project_erdbeben/Daten/data_full_00001.Rda")
+library(ggplot2)
+```
+
+
+Zuallererst zwei Barplots(zu 100% skaliert) zu dip und rake unterteilt in Intervalle der Winkel.
+
+```{r}
+# Temporaere Hilfsspalte
+full_data$count <- rep(1, nrow(full_data))
+# Intervalle fuer dip
+labels_dip <- character(18)
+for (i in seq_len(length(labels_dip))) {
+  labels_dip[[i]] <- paste0(seq(-0, 90, 5)[[i]], " to ", c(seq(-0, 90 , 5))[[i + 1]])
+}
+full_data$dipType <- cut(full_data$dip, breaks = c(-0.1, seq(5, 90, 5)),
+                          labels = labels_dip)
+# Barplots
+ggplot(data = full_data, aes(x = dipType, y = count, fill = triggerType)) +
+  geom_bar(position = "fill", stat = "identity") + xlab(" DipType") + 
+  ylab("Prozentanteil") + theme(axis.text.x = element_text(angle = 90, size = 12))
+```
+
+```{r}
+# Intervalle fuer rake
+labels_rake <- character(36)
+for (i in seq_len(length(labels_rake))) {
+  labels_rake[[i]] <- paste0(seq(-180, 180 , 10)[[i]], " to ", 
+                             c(seq(-180, 185 , 10))[[i + 1]])
+}
+full_data$rakeType <- cut(full_data$rake, breaks = c(-180.1, seq(-170, 180 , 10)),
+                   labels = labels_rake)
+# Barplot
+ggplot(data = full_data, aes(x = rakeType, y = count, fill = triggerType)) +
+  geom_bar(position = "fill", stat = "identity") + xlab(" RakeType") + 
+  ylab("Prozentanteil") + theme(axis.text.x = element_text(angle = 90, size = 12))
+```
+
+Bereits aus diesem Plot zu rake lässt sich schliessen, dass unsere Vermutung, dass vermehrt Triggerbeben in Bereichen von -90/90° vermutlich falsch war. Daher biteten unserere zyklische Variable und die Variable des absoluten Abstands zu -90/90° auch fast keinen Erklärungswert und sind nicht signifkant.
+
+
+
+
+
+```{r}
+# Grafisch versucht die Variable zyklisch ueber (-)90° laufen zu lassen
+ggplot(full_data, aes(x = rake, colour = triggerType)) + geom_histogram(bins = 50) +
+  geom_line(aes(y = sin(rake * 2 * pi / 180 + 110) + 
+                  200 * cos(rake * 2 * pi / 180 + 110) + 200), 
+            col = "black")
+# Und dann derart in ein Modell einflassen lassen
+summary(lm(triggerCountTh ~ I(sin(rake * 2 * pi / 180 + 110) + 
+                                200 * cos(rake * 2 * pi / 180 + 110) + 1), full_data))
+```
+Der p-Wert bei dieser Variable liegt nur bei 0.499 (leider hier etwas verzerrt).
+
+
+
+```{r}
+# Absoluter Abstand zu den naeheren (-)90°
+rake_abs <- full_data$rake
+for (i in seq_len(length(rake_abs))) {
+  if (rake_abs[[i]] < 0) {
+    rake_abs[[i]] <- abs(rake_abs[[i]] + 90)
+  }
+  else {
+    rake_abs[[i]] <- abs(rake_abs[[i]] - 90)
+  }
+}
+full_data$rake_abs <- rake_abs
+head(full_data[, c("rake", "rake_abs")])
+summary(lm(triggerCountTh ~ rake_abs, full_data))
+```
+
+
+Im folgenden noch weitere Analyseergebnisse dieser beiden Winkel.

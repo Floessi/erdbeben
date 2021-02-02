@@ -1,0 +1,124 @@
+---
+title: "Rake II/ Strain-Rate"
+author: "Erdbebengruppe"
+date: "23 1 2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r setup_2, include=FALSE}
+library(ggplot2)
+library(mgcv)
+load("C:/Semester_5/Statistisches_Praktikum/R_project_erdbeben/Daten/data_full_00001.Rda")
+magType <- character()
+for (i in seq_len(nrow(full_data))) {
+  if (full_data$mag[[i]] >= 4.0 & full_data$mag[[i]] <= 4.9) {
+    magType[[i]] <- "4.0-4.9"
+  }
+  else if (full_data$mag[[i]] >= 5.0 & full_data$mag[[i]] <= 5.9) {
+    magType[[i]] <- "5.0-5.9"
+  }
+  else if (full_data$mag[[i]] >= 6.0 & full_data$mag[[i]] <= 6.9) {
+    magType[[i]] <- "6.0-6.9"
+  }
+  else {
+    magType[[i]] <- "ab 7.0"
+  }
+}
+full_data$magType <- factor(magType, levels = c("4.0-4.9", "5.0-5.9", "6.0-6.9", "ab 7.0"))
+
+```
+
+## Rake modifiziert
+
+Hier ist nun der Rake anders modifiziert und auch inhaltlich nun stimmig.
+
+```{r rake}
+# -90 "perfekte" Abschiebung bis zu 90° "perfekte" Aufschiebung
+rake_mod <- full_data$rake
+for (i in seq_len(length(rake_mod))) {
+  if (rake_mod[[i]] < 0) {
+    rake_mod[[i]] <- (-90) + abs(rake_mod[[i]] + 90)
+  }
+  else {
+    rake_mod[[i]] <- 90 - abs(rake_mod[[i]] - 90)
+  }
+}
+full_data$rake_mod <- rake_mod
+head(full_data[, c("rake", "rake_mod")], n = 10)
+
+```
+
+Auch graphisch lässt sich nun hier ein leichter Zusammenhang vermuten.
+
+```{r rake_graph}
+# Kategorisiere die rake_mod Varibale
+labels_rake_mod <- character(18)
+for (i in seq_len(length(labels_rake_mod))) {
+  labels_rake_mod[[i]] <- paste0(seq(-90, 90 , 10)[[i]], " to ", c(seq(-90, 95 , 10))[[i + 1]])
+}
+full_data$rakeModType <- cut(full_data$rake_mod, breaks = c(-90.1, seq(-80, 90 , 10)),
+                          labels = labels_rake_mod)
+
+# Graphisch erneut über einen zu 100% gestackten Barplot
+full_data$count <- rep(1, nrow(full_data))
+ggplot(data = full_data, aes(x = rakeModType, y = count, fill = triggerType)) +
+  geom_bar(position = "fill", stat = "identity") + xlab(" RakeModType") + ylab("Prozentanteil") +
+  theme(axis.text.x = element_text(angle = 90, size = 12))
+```
+
+Diesen Zusammenhang haben wir versucht mit Regressionsplines in ein Modell nur mit der Magnitude (a*exp(b*mag), wie zuletzt) aufzunehmen, jedoch werden die geschätzen Koeffizienten größenteils nicht signifikant. Also vermutlich bieten sie sobald die Magnitude mit drin ist nur noch relativ wenig Erklärungswert der Streuung.
+Die R-interne gam-Funktion die selbst über "Penalisierte Splines" die Regressionsplines bestimmt, schafft es zwar die Splines signifikant ins Modell einzubringen, jedoch wird auch hier das Modell, dadurch nur geringfügig besser. Hier einmal beide Modelloutputs und die zugehörigen AIC.
+
+```{r rake_model}
+# Modell ohne rake_mod
+test_model1 <- gam(formula = triggerCountTh ~ I(8.971e-08 * exp(2.581 * mag)), family = nb(), data = full_data)
+summary(test_model1)
+AIC(test_model1)
+# Modell mit rake_mod, geschaetzter Thetaparameter aus test_model1
+test_model2 <- gam(formula = triggerCountTh ~ I(8.971e-08 * exp(2.581 * mag)) + s(rake_mod, bs = "ps"), family = negbin(0.183), data = full_data)
+summary(test_model2)
+AIC(test_model2)
+```
+Ansich würde der von gam gewählte Regressionspline den Zusammenhang eigentlich wie wir ihn visuell gefunden haben genauso einbringen. Hier ein Graph wie das gam-Modell rake_mod einfliessen lässt.
+
+```{r rake_model2, echo=FALSE}
+plot(x = test_model2, shade = TRUE, select = 1, cex.main = 0.9, main = "Glatter Effekt rake_mod")
+```
+
+Wir werden demnächst noch einen Termin mit Herrn Küchenhoff machen und unter anderem dieses Problem besprechen.
+
+
+
+## Strain-Rate
+
+Die Strain-Rate lässt grafisch einen leicht positiven linearen Zusammenhang zur Nachbebenanzahl vermuten. Im Folgenden ein paar Outputs und Plots zu unserer bisherigen Strain-Rate-Analyse.
+
+```{r strain_1, echo=FALSE}
+summary(full_data$strainRate)
+```
+
+```{r strain_2}
+# Histogmme 
+ggplot(full_data, aes(strainRate)) +  geom_histogram(bins = 100)
+ggplot(full_data, aes(strainRate, colour = triggerType)) + geom_histogram(bins = 50)
+# Nur Beben, die Nachbeben triggern
+ggplot(full_data[full_data$triggerType != "0 Nachbeben", ], aes(strainRate, colour = triggerType)) + geom_histogram(bins = 20)
+```
+
+```{r strain_3}
+# Kategoriale Variable fuer die grafische Analyse
+full_data$strainType <- cut(full_data$strainRate, breaks = c(-0.1, 250, 500, 750, 1000, 1250, max(full_data$strainRate)), labels = c("0-250", "250-500", "500-750", "750-1000", "1000-1250", "1250+"))
+summary(full_data$strainType)
+
+# Barplot
+ggplot(data = full_data, aes(x = strainType, y = count, fill = triggerType)) +
+  geom_bar(position = "fill", stat = "identity") + xlab(" strainType") + ylab("Prozentanteil") +
+  theme(axis.text.x = element_text(angle = 90, size = 12))
+```
+
+Der Wert von 1205.640431472 für die Strain-Rate kommt 351 mal in unseren Daten vor, aber das ist vermutlich ein Artefakt vom ursprünglichen Interpolieren dieser Variable?

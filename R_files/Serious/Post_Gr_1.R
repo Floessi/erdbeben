@@ -133,9 +133,8 @@ for (i in seq_len(length(rake_abs))) {
     rake_abs[[i]] <- abs(rake_abs[[i]] - 90)
   }
 }
-
 full_data$rake_abs <- rake_abs
-View(full_data[, c("rake", "rake_abs")])
+head(full_data[, c("rake", "rake_abs")])
 
 
 

@@ -12,7 +12,7 @@ get.data.base <- function() {
   part1 <- read.table("Daten/Urspruengliche_Daten/JapanBosai_mw40_1997enriched.txt", header = TRUE, sep = ";")
   part2 <- read.csv("Daten/Urspruengliche_Daten/201126_strikeDipRake_selection.csv", header = TRUE, sep = ";")
   part3 <- read.csv("Daten/Urspruengliche_Daten/triggerRelations.csv", header = TRUE)
-  part4 <- read.table("Daten/Urspruengliche_Daten/strainRates.txt", sep = ";")
+  part4 <- read.table("Daten/Urspruengliche_Daten/strainRates.txt", sep = ";", dec = ",")
   part1 <- part1[,-c(8, 9, 10, 11, 12, 13)]
   colnames(part3) <- c("distanceMeasure", "triggerID")
   colnames(part4) <- "strainRate"
@@ -146,14 +146,14 @@ new.columns2 <- function(input_data) {
 
   # Kategoriale Variable fuer den triggerCountTh
   triggerType <- character()
-  for (i in seq_len(nrow(full_data))) {
-    if (full_data$triggerCountTh[[i]] == 0) {
+  for (i in seq_len(nrow(resultData))) {
+    if (resultData$triggerCountTh[[i]] == 0) {
       triggerType[[i]] <- "0 Nachbeben"
     }
-    else if (full_data$triggerCountTh[[i]] == 1) {
+    else if (resultData$triggerCountTh[[i]] == 1) {
       triggerType[[i]] <- "1 Nachbeben"
     }
-    else if (full_data$triggerCountTh[[i]] >= 2 & full_data$triggerCountTh[[i]] <= 5) {
+    else if (resultData$triggerCountTh[[i]] >= 2 & resultData$triggerCountTh[[i]] <= 5) {
       triggerType[[i]] <- "2-5 Nachbeben"
     }
     else {
