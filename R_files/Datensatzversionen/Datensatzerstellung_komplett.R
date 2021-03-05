@@ -162,6 +162,37 @@ new.columns2 <- function(input_data) {
   }
   resultData$triggerType <- factor(triggerType, levels = c("0 Nachbeben", "1 Nachbeben", "2-5 Nachbeben", "6+ Nachbeben"))
 
+  # Kategoriale Variable fuer die Magnitude
+  magType <- character()
+  for (i in seq_len(nrow(resultData))) {
+    if (resultData$mag[[i]] >= 4.0 & resultData$mag[[i]] <= 4.9) {
+      magType[[i]] <- "4.0-4.9"
+    }
+    else if (resultData$mag[[i]] >= 5.0 & resultData$mag[[i]] <= 5.9) {
+      magType[[i]] <- "5.0-5.9"
+    }
+    else if (resultData$mag[[i]] >= 6.0 & resultData$mag[[i]] <= 6.9) {
+      magType[[i]] <- "6.0-6.9"
+    }
+    else {
+      magType[[i]] <- "ab 7.0"
+    }
+  }
+  resultData$magType <- factor(magType, levels = c("4.0-4.9", "5.0-5.9", "6.0-6.9", "ab 7.0"))
+
+  # Rake-Variable modifiziert von "perfekter Abschiebung"(-90°) zu
+  # "perfekter Aufschiebung"(90°)
+  rake_mod <- resultData$rake
+  for (i in seq_len(length(rake_mod))) {
+    if (rake_mod[[i]] < 0) {
+      rake_mod[[i]] <- (-90) + abs(rake_mod[[i]] + 90)
+    }
+    else {
+      rake_mod[[i]] <- 90 - abs(rake_mod[[i]] - 90)
+    }
+  }
+  resultData$rake_mod <- rake_mod
+
   resultData
 }
 
@@ -183,20 +214,24 @@ full_data$elevation <- full_data$elevation / 1000
 
 
 ###################################################################################################
-# Teil 5, Ueber- oder unterdurchschnittliches Triggering als kategoriale Variable
+# Winkelkategorisierungen
 ###################################################################################################
-# Auf Werten basierend aus dem Matlab Curvefitting-Tool und nur auf Threshold 0.00001 sinnvoll
-trigTrend <- character()
-for (i in seq_len(nrow(full_data))) {
-  if (full_data$triggerCountTh[[i]] > 8.971e-08 * exp(2.581 * full_data$mag[[i]])) {
-    trigTrend[[i]] <- "above_avg"
-  }
-  else {
-    trigTrend[[i]] <- "below_avg"
-  }
-}
-full_data$trigTrend <- factor(trigTrend, levels = c("below_avg", "above_avg"))
 
+# Kategorisiere die rake_mod Varibale
+labels_rake_mod <- character(18)
+for (i in seq_len(length(labels_rake_mod))) {
+  labels_rake_mod[[i]] <- paste0(seq(-90, 90 , 10)[[i]], " to ", c(seq(-90, 95 , 10))[[i + 1]])
+}
+full_data$rakeModType <- cut(full_data$rake_mod, breaks = c(-90.1, seq(-80, 90 , 10)),
+                             labels = labels_rake_mod)
+
+# Kategorisiere die dip Varibale
+labels_dip <- character(18)
+for (i in seq_len(length(labels_dip))) {
+  labels_dip[[i]] <- paste0(seq(-0, 90, 5)[[i]], " to ", c(seq(-0, 90 , 5))[[i + 1]])
+}
+full_data$dipType <- cut(full_data$dip, breaks = c(-0.1, seq(5, 90, 5)),
+                         labels = labels_dip)
 
 ###################################################################################################
 # Teil 6, zum Daten abspeichern
@@ -211,3 +246,27 @@ full_data[, c("directQuakes","clusterQuakes"):=NULL]
 # Als Rda
 save(full_data, file = "Daten/data_full_no_lists_00001.Rda")
 
+
+
+###################################################################################################
+# Neu interpolierte Daten austauschen (27.02.2021)
+###################################################################################################
+
+load("Daten/data_full_00001.Rda")
+
+columns_updated <- read.table("Daten/Urspruengliche_Daten/HeatFlow_Strain_210227.txt",
+                              header = TRUE, sep = ",")
+columns_rest <- full_data[, ! names(full_data) %in% c("heatFlow", "crustalThick", "mantleThick",
+                                                      "elevation", "strainRate")]
+full_data <- merge(columns_rest, columns_updated)
+
+# Diese wurden urspruenglich alles in m angegeben, wir transformieren crustal- und mantleThick auf
+# 10km und elevation auf km
+full_data$crustalThick <- full_data$crustalThick / 10000
+full_data$mantleThick <- full_data$mantleThick / 10000
+full_data$elevation <- full_data$elevation / 1000
+
+
+# Speichere die geupdateten Daten
+# Als Rda
+save(full_data, file = "Daten/data_full_00001_updated.Rda")

@@ -1,3 +1,4 @@
+#### Post Besprechung ###
 ######################################################################################################
 # Post-Besprechung mit Prof. Kuechenhoff am 28.01 ####################################################
 ######################################################################################################
@@ -7,7 +8,7 @@ library(ggplot2)
 library(mgcv)
 library(MASS)
 library(dplyr)
-load("Daten/data_full_00001.Rda")
+full_data <- load("C:/Users/nikol/OneDrive/Dokumente/NeuErdbeben/Datensaetze/data_full_00001.Rda")
 
 # Spalte fuer modifizierten rake
 rake_mod <- full_data$rake
@@ -27,8 +28,6 @@ full_data$rake_mod <- rake_mod
 # Welche Variablen und wie sind diese fuer ein Modell relevant? ######################################
 ######################################################################################################
 
-colnames(full_data)
-
 # Relevant zum jetztigen Stand fuer ein triggerCountTh-Modell:
 
 # mag:          einfach ohne Zusatzfuntion in negBin-Modelle aufnehmen, a*exp(b*mag) waere denkbar
@@ -41,13 +40,13 @@ colnames(full_data)
 # rake_mod:     mit Spline oder Polynom einfliessen lassen, siehe stacked-Barplot
 # strainRate:   einfach ohne Zusatzfuntion in negBin-Modelle aufnehmen
 
-
+attach(full_data)
 ######################################################################################################
 # Simples negBin #####################################################################################
 model_negBin <- glm.nb(formula = triggerCountTh ~ mag + depth + heatFlow + crustalThick +
                          mantleThick + dip + rake_mod + strainRate, data = full_data)
 summary(model_negBin)
-# heatFlow nicht signifikant
+# heatFlow nicht signifikant , wird aber nicht durch stepAIC rausgeschmissen
 stepAIC(model_negBin)
 # Result-model
 # glm.nb(formula = triggerCountTh ~ mag + depth + crustalThick + mantleThick + dip +
@@ -55,7 +54,7 @@ stepAIC(model_negBin)
 
 # Ohne heatFlow #####################################################################################
 model_negBin2 <- glm.nb(formula = triggerCountTh ~ mag + depth + crustalThick + mantleThick +
-                         dip + rake_mod + strainRate, data = full_data)
+                          dip + rake_mod + strainRate, data = full_data)
 summary(model_negBin2)
 # Hypothese heatFlow-Koeffizient=0
 anova(model_negBin2, model_negBin)
@@ -67,8 +66,8 @@ anova(model_negBin2, model_negBin)
 ######################################################################################################
 # Negbin aber penalisierte Splines fuer rake_mod? ####################################################
 model_negBin_gam <- gam(formula = triggerCountTh ~ mag + depth + heatFlow + crustalThick +
-                           mantleThick + dip + s(rake_mod, bs = "ps") + strainRate,
-                         family = nb(), data = full_data)
+                          mantleThick + dip + s(rake_mod, bs = "ps") + strainRate,
+                        family = nb(), data = full_data)
 summary(model_negBin_gam)
 # dip wird nicht mehr signifikant und heatflow erneut nicht
 # ~6 df fuer penalisierte splines von rake_mod => sinnvoll
@@ -76,8 +75,8 @@ AIC(model_negBin_gam)
 
 # Ohne dip und heatFlow
 model_negBin_gam2 <- gam(formula = triggerCountTh ~ mag + depth + crustalThick +
-                          mantleThick + s(rake_mod, bs = "ps") + strainRate,
-                        family = nb(), data = full_data)
+                           mantleThick + s(rake_mod, bs = "ps") + strainRate,
+                         family = nb(), data = full_data)
 summary(model_negBin_gam2)
 # Alles signifikant, aber ist das das bessere Modell?
 AIC(model_negBin_gam2)
@@ -213,4 +212,4 @@ AIC_step_koft <- function(model, data, all_models = FALSE) {
 
 
 test <- zeroinfl(triggerCountTh ~ mag + depth + heatFlow + crustalThick +
-                    mantleThick + dip + rake_mod + strainRate, full_data, dist = "negbin")
+                   mantleThick + dip + rake_mod + strainRate, full_data, dist = "negbin")

@@ -146,7 +146,8 @@ test1 <- lm(triggerCountTh ~ mag + I(mag^2) + I((mag > 4.9) * ((mag - 5.0)^2)) +
 test2 <- glm.nb(triggerCountTh ~ mag + I(mag^2) + I(mag^3) + depth + heatFlow + crustalThick + mantleThick +
                   elevation +strike + dip + rake, full_data, link = log)
 
-test3 <- zeroinfl(triggerCountTh ~ mag + depth + elevation, full_data, dist = "negbin")
+test3 <- zeroinfl(triggerCountTh ~ mag + depth + heatFlow + crustalThick +
+                    mantleThick + dip + rake_mod + strainRate, full_data, dist = "negbin")
 
 test4 <- lm(triggerCountTh ~ mag + dip, full_data)
 
