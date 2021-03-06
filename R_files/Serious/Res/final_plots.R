@@ -8,11 +8,22 @@ library(dplyr)
 library(png)
 library(grid)
 library(data.table)
+library(gridExtra)
+library(mapdata)
 
 # Lade die geupdateten Daten vom 27.02.2021
 load("Daten/data_full_00001_updated.Rda")
 
-
+# Daten zum aggregieren
+heat_data <- copy(full_data)
+heat_data$lon <- floor(heat_data$lon) + 0.5
+heat_data$lat <- floor(heat_data$lat) + 0.5
+heat_data_res <- cbind(aggregate(formula = heatFlow~lon+lat, data = heat_data, FUN = mean),
+                       aggregate(formula = crustalThick~lon+lat, data = heat_data, FUN = mean)[, 3],
+                       aggregate(formula = mantleThick~lon+lat, data = heat_data, FUN = mean)[, 3],
+                       aggregate(formula = heatFlow~lon+lat, data = heat_data, FUN = length)[, 3])
+colnames(heat_data_res) <- c("long", "lat", "heatFlow", "crustalThick", "mantleThick", "count")
+full_data$count <- rep(1, nrow(full_data))
 
 # Relevant zum jetztigen Stand fuer ein triggerCountTh-Modell:
 
@@ -28,20 +39,178 @@ load("Daten/data_full_00001_updated.Rda")
 # strainRate:   einfach ohne Zusatzfuntion in negBin-Modelle aufnehmen
 
 
+# Hoehe der Grafiken 600p
+myTheme <- theme(plot.title = element_text(hjust = 0.5, size = 14),
+                 axis.text.x = element_text(size = 11),
+                 axis.text.y = element_text(size = 11))
+
+japan <- map_data("japan")
+
+
+# Tohoku-Cluster-Plot
+ggplot() +
+  geom_polygon(data = japan, aes(x = long, y = lat, group = group), fill = NA, color = "black") +
+  coord_fixed(1.3) +
+  geom_point(data = full_data[full_data$clusterCount > 300, ], aes(x = lon, y = lat),
+             col = "red", alpha = 0.55) +
+  scale_x_continuous(name = "Geographische Länge", expand = c(0, 0),
+                     breaks = seq(128, 145, by = 2), limits = c(127, 146)) +
+  scale_y_continuous(name = "Geographische Breite", expand = c(0, 0),
+                     breaks = seq(28, 45, by = 2), limits = c(27, 46)) +
+  ggtitle("Erdbebencluster des Tohoku-Bebens") + myTheme
+
+# Zielvariablen-Plot
+target_freq <- as.data.frame(table(full_data$triggerCountTh))
+ggplot(data = target_freq, aes(x = Var1, y = log(Freq+0.1))) +
+  geom_bar(stat = "identity") + xlab("Anzahl direkter Nachbeben") +
+  labs(title = "Logarithmierte Häufigkeit der Nachbebenanzahl",
+       y = "Logarithmierte absolute Häufigkeit") + myTheme +
+  scale_x_discrete(breaks = c(1:9,10,13,18,26,32,45,507))
+
+# Magnitude-Boxplot
+ggplot(full_data, aes(x = magType, y = log(triggerCountTh), col = magType)) +
+  geom_boxplot() + theme(legend.position = "none",
+                         plot.title = element_text(hjust = 0.5, size = 13.5),
+                         axis.text.x = element_text(size = 11),
+                         axis.text.y = element_text(size = 11)) +
+  labs(x = "Kategorisierte Magnitude", y = "Logarithmierte Nachbebenanzahl",
+       title = "Logarithmierte Nachbebenanzahl ohne Beben mit keinen Nachbeben")
+table(subset(full_data, select = c("magType", "triggerType")))
+summary(full_data$magType)
+
+# Magnitude-Scatterplot
+ggplot(full_data, aes(x = mag, y = triggerCountTh)) + geom_point() + xlim(c(4, 8)) +
+  ylim(c(0, 80)) + myTheme +
+  labs(x = "Magnitude", y = "Nachbebenanzahl")
+
+# Magnitude-Stacked-Barplot
+ggplot(data = full_data, aes(x = magType, y = count, fill = triggerType)) +
+  geom_bar(position = "fill", stat = "identity") +
+  theme(axis.text.x = element_text(angle = 0, size = 12)) + myTheme +
+  labs(title = "Anteile der Kategorien der Nachbebenanzahl", x = "Kategorie Magnitude",
+       y = "Relativer Anteil",fill = "")
+
+
+# StrainRate-Stacked-Barplot
+full_data$strainType <- cut(
+  full_data$strainRate, breaks = c(-0.1, 250, 500, 750, 1000, 1250, max(full_data$strainRate)),
+  labels = c("0-250", "250-\n500", "500-\n750", "750-\n1000", "1000-\n1250", "1250+"))
+
+ggplot(data = full_data, aes(x = strainType, y = count, fill = triggerType)) +
+  geom_bar(position = "fill", stat = "identity") +
+  theme(axis.text.x = element_text(angle = 0, size = 12)) + myTheme +
+  labs(title = "Anteile der Kategorien der Nachbebenanzahl", x = "Kategorie Strain-Rate",
+       y = "Relativer Anteil",fill = "")
+table(full_data$strainType)
+
+# Rake_mod-Stacked-Barplot
+ggplot(data = full_data, aes(x = rakeModType, y = count, fill = triggerType)) +
+  geom_bar(position = "fill", stat = "identity") +
+  theme(plot.title = element_text(hjust = 0.5, size = 13),
+        axis.text.x = element_text(angle = 90, size = 11),
+        axis.text.y = element_text(size = 11)) +
+  labs(title = "Nachbeben-Kategorien innerhalb der modifizierten Rake-Kategorien",
+       x = "Kategorie des modifizierten Rakes", y = "Relativer Anteil", fill = "")
+
+# heatflow
+ggplot() +
+  geom_polygon(data = japan, aes(x = long, y = lat, group = group), fill = NA, color = "black") +
+  coord_fixed(1.3) + geom_point(data = heat_data_res,
+                                aes(x = long, y = lat, col = heatFlow),
+                                size = 4, shape = 15, alpha=0.7) +
+  scale_x_continuous(name = "Geographische Länge", expand = c(0, 0),
+                     breaks = seq(128, 145, by = 2), limits = c(127, 146)) +
+  scale_y_continuous(name = "Geographische Breite", expand = c(0, 0),
+                     breaks = seq(28, 45, by = 2), limits = c(27, 46)) +
+  ggtitle(expression(paste("Heat-Flow im Koordinaten-Gitter in W/", m^{2}))) + labs(col = "Heat Flow") +
+  scale_color_gradient(low = "yellow", high = "red") +
+  theme(plot.title = element_text(hjust = 0.5, size = 14),
+        axis.text.x = element_text(size = 11),
+        axis.text.y = element_text(size = 11))
+
+# crustalThick
+ggplot() +
+  geom_polygon(data = japan, aes(x = long, y = lat, group = group), fill = NA, color = "black") +
+  coord_fixed(1.3) + geom_point(data = heat_data_res,
+                                aes(x = long, y = lat, col = crustalThick * 10),
+                                size = 4, shape = 15, alpha=0.7) +
+  scale_x_continuous(name = "Geographische Länge", expand = c(0, 0),
+                     breaks = seq(128, 145, by = 2), limits = c(127, 146)) +
+  scale_y_continuous(name = "Geographische Breite", expand = c(0, 0),
+                     breaks = seq(28, 45, by = 2), limits = c(27, 46)) +
+  ggtitle("Erdkrustendicke im Koordinaten-Gitter in km") + labs(col = "Erdkrustendicke") +
+  scale_color_gradient(low = "yellow", high = "red") +
+  theme(plot.title = element_text(hjust = 0.5, size = 14),
+        axis.text.x = element_text(size = 11),
+        axis.text.y = element_text(size = 11))
+
+# mantleThick
+ggplot() +
+  geom_polygon(data = japan, aes(x = long, y = lat, group = group), fill = NA, color = "black") +
+  coord_fixed(1.3) + geom_point(data = heat_data_res,
+                                aes(x = long, y = lat, col = mantleThick * 10),
+                                size = 4, shape = 15, alpha=0.7) +
+  scale_x_continuous(name = "Geographische Länge", expand = c(0, 0),
+                     breaks = seq(128, 145, by = 2), limits = c(127, 146)) +
+  scale_y_continuous(name = "Geographische Breite", expand = c(0, 0),
+                     breaks = seq(28, 45, by = 2), limits = c(27, 46)) +
+  ggtitle("Lithosphärischer Mantel im Koordinaten-Gitter in km") + labs(col = "Manteldicke") +
+  scale_color_gradient(low = "yellow", high = "red") +
+  theme(plot.title = element_text(hjust = 0.5, size = 14),
+        axis.text.x = element_text(size = 11),
+        axis.text.y = element_text(size = 11))
+
+# Optionaler Heat-Flow-Stacked-Barplot
+full_data$heatflowType <- cut(
+  full_data$heatFlow, breaks = c(0.049, 0.07, 0.09, 0.11, 0.13),
+  labels = c("0.05 -\n0.07", "0.07 -\n0.09", "0.09 -\n0.11", "0.11 -\n0.13"))
+
+ggplot(data = full_data, aes(x = heatflowType, y = count, fill = triggerType)) +
+  geom_bar(position = "fill", stat = "identity") +
+  theme(axis.text.x = element_text(angle = 0, size = 11)) + myTheme +
+  labs(title = "Anteile der Kategorien der Nachbebenanzahl", x = "Kategorie Heat-Flow",
+       y = "Relativer Anteil",fill = "")
+
+# Heatflow-Box
+ggplot(full_data, aes(x = heatFlow, y = triggerType, col = triggerType)) +
+  geom_boxplot() + theme(legend.position = "none") + myTheme +
+  labs(y = "Kategorisierte Nachbebenanzahlen", x = "Heatflow")
+
+# Optionaler depth-Stacked-Barplot
+full_data$depthType <- cut(
+  full_data$depth, breaks = c(-0.1, 25, 50, 75, 100),
+  labels = c("0 - 25", "25 - 50", "50 -75", "75 - 100"))
+
+ggplot(data = full_data, aes(x = depthType, y = count, fill = triggerType)) +
+  geom_bar(position = "fill", stat = "identity") +
+  theme(axis.text.x = element_text(angle = 0, size = 11)) + myTheme +
+  labs(title = "Anteile der Kategorien der Nachbebenanzahl", x = "Kategorie Tiefe in km",
+       y = "Relativer Anteil",fill = "")
+
+
+
+
+
+
+
+
+
+
 
 ########################################################################################
 # Magnitude und Stainrate ##############################################################
 ########################################################################################
 # Scatterplot Magnitude
 ggplot(full_data, aes(x = mag, y = triggerCountTh)) + geom_point() +
-  labs(title = "Magnitude~Nachbebenanzahl", x = "Magnitude", y = "Nachbebenanzahl")
+  labs(title = "Magnitude~Nachbebenanzahl", x = "Magnitude", y = "Nachbebenanzahl") +
+  myTheme
 
 ggplot(full_data, aes(x = mag, y = triggerCountTh)) + geom_point() + xlim(c(4, 8)) +
   ylim(c(0, 80)) +
   labs(title = "Magnitude~Nachbebenanzahl", x = "Magnitude", y = "Nachbebenanzahl")
 
 # Boxplots
-ggplot(full_data, aes(x = magType, y = triggerCountTh, col = magType)) +
+ggplot(full_data, aes(x = magType, y = log(triggerCountTh), col = magType)) +
   geom_boxplot() + theme(legend.position = "none") +
   labs(x = "kategorisierte Magnitude", y = "Nachbebenanzahl")
 ggplot(full_data[full_data$triggerCountTh > 0 & full_data$triggerCountTh < 100, ],
@@ -65,8 +234,7 @@ ggplot(full_data, aes(strainRate, colour = triggerType)) + geom_histogram(bins =
        colour = "")
 
 # Stacked Barplot
-full_data$strainType <- cut(full_data$strainRate,
-                            breaks = c(-0.1, 250, 500, 750, 1000,
+full_data$strainType <- cut(full_data$strainRate, breaks = c(-0.1, 250, 500, 750, 1000,
                                        1250, max(full_data$strainRate)),
                             labels = c("0-250", "250-500", "500-750",
                                        "750-1000", "1000-1250", "1250+"))
@@ -197,9 +365,9 @@ ggplot(data = full_data[full_data$triggerType == "2-5 Nachbeben" |
   scale_color_gradient(low = "yellow", high = "red") +
   ggtitle("Verteilung der Wärmestromdichte in W/(m^2)") + labs(col = "Wärmestromdichte")
 
-ggplot(full_data, aes(x = triggerType, y = heatFlow, col = triggerType)) +
+ggplot(full_data, aes(x = heatFlow, y = triggerType, col = triggerType)) +
   geom_boxplot() + theme(legend.position = "none") +
-  labs(x = "Kategorisierte Nachbebenanzahlen", y = "Heatflow")
+  labs(y = "Kategorisierte Nachbebenanzahlen", x = "Heatflow")
 ggplot(full_data, aes(x = triggerType, y = depth, col = triggerType)) +
   geom_boxplot() + theme(legend.position = "none") +
   labs(x = "Kategorisierte Nachbebenanzahlen", y = "Heatflow")
@@ -311,20 +479,19 @@ table(full_data[full_data$mag > 5.9, ]$triggerType)
 ########################################################################################
 table(full_data$clusterCount)
 
-ggplot(full_data[full_data$clusterCount > 35, ]) +
-  annotation_custom(rasterGrob(japan_background, width = unit(1,"npc"),
-                               height = unit(1,"npc")), -Inf, Inf, -Inf, Inf) +
-  geom_point(aes(x = lon, y = lat, col = as.factor(clusterCount))) +
-  theme(plot.title = element_text(hjust = 0.5, size = 13),
+ggplot() +
+  geom_polygon(data = japan, aes(x = long, y = lat, group = group), fill = NA, color = "black") +
+  coord_fixed(1.3) +
+  geom_point(data = full_data[full_data$clusterCount > 300, ], aes(x = lon, y = lat),
+             col = "red", alpha = 0.55) +
+  theme(plot.title = element_text(hjust = 0.5, size = 14),
         axis.text.x = element_text(size = 11),
-        axis.text.y = element_text(size = 11),
-        legend.text = element_text(vjust = 0.5),
-        axis.line = element_line(colour = "black", size = 0.2, linetype = "solid")) +
+        axis.text.y = element_text(size = 11)) +
   scale_x_continuous(name = "Geographische Länge", expand = c(0, 0),
-                     breaks = seq(128, 145, by = 2), limits = c(127, 145)) +
+                     breaks = seq(128, 145, by = 2), limits = c(127, 146)) +
   scale_y_continuous(name = "Geographische Breite", expand = c(0, 0),
-                     breaks = seq(28, 45, by = 2), limits = c(27, 45)) +
-  ggtitle("Die 10 größten Cluster")  + labs(col = "Clustergröße")
+                     breaks = seq(28, 45, by = 2), limits = c(27, 46)) +
+  ggtitle("Erdbebencluster des Tohoku-Bebens")
 
 
 
@@ -335,15 +502,7 @@ ggplot(full_data[full_data$clusterCount > 35, ]) +
 # Hintergrundbild Japan
 japan_background <- readPNG("Dokumente/japan.png")
 
-# Daten zum aggregieren
-heat_data <- copy(full_data)
-heat_data$lon <- floor(heat_data$lon) + 0.5
-heat_data$lat <- floor(heat_data$lat) + 0.5
 
-
-heat_data_res <- cbind(aggregate(formula = heatFlow~lon+lat, data = heat_data, FUN = mean),
-                       aggregate(formula = heatFlow~lon+lat, data = heat_data, FUN = length)[, 3])
-colnames(heat_data_res) <- c("lon", "lat", "heatFlow", "count")
 sum(heat_data_res$count)
 ggplot(data = heat_data_res[heat_data_res$count > 5, ])  +
   annotation_custom(rasterGrob(japan_background, width = unit(1,"npc"),
@@ -364,18 +523,15 @@ ggplot(data = heat_data_res[heat_data_res$count > 5, ])  +
 
 
 
-# Nikos Mapansatz
-install.packages("mapdata")
-library(mapdata)
+
 
 japan <- map_data("japan")
 
-heat_data2 <- heat_data_res
-heat_data2$long <- heat_data_res$lon
+
 
 ggplot() +
   geom_polygon(data = japan, aes(x = long, y = lat, group = group), fill = NA, color = "black") +
-  coord_fixed(1.3) + geom_point(data = heat_data2[heat_data2$count > 5, ],
+  coord_fixed(1.3) + geom_point(data = heat_data_res[heat_data_res$count > 5, ],
                                 aes(x = long, y = lat, col = heatFlow),
                                 size = 10, shape = 15, alpha=0.7) +
   scale_x_continuous(name = "Geographische Länge", expand = c(0, 0),
