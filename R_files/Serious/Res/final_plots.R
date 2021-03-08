@@ -65,7 +65,7 @@ ggplot(data = target_freq, aes(x = Var1, y = log(Freq+0.1))) +
   geom_bar(stat = "identity") + xlab("Anzahl direkter Nachbeben") +
   labs(title = "Logarithmierte Häufigkeit der Nachbebenanzahl",
        y = "Logarithmierte absolute Häufigkeit") + myTheme +
-  scale_x_discrete(breaks = c(1:9,10,13,18,26,32,45,507))
+  scale_x_discrete(breaks = c(0,1:9,10,13,18,26,32,45,507))
 
 # Magnitude-Boxplot
 ggplot(full_data, aes(x = magType, y = log(triggerCountTh), col = magType)) +
@@ -122,7 +122,7 @@ ggplot() +
                      breaks = seq(128, 145, by = 2), limits = c(127, 146)) +
   scale_y_continuous(name = "Geographische Breite", expand = c(0, 0),
                      breaks = seq(28, 45, by = 2), limits = c(27, 46)) +
-  ggtitle(expression(paste("Heat-Flow im Koordinaten-Gitter in W/", m^{2}))) + labs(col = "Heat Flow") +
+  ggtitle(expression(paste("Heat-Flow im Koordinaten-Gitter in W/", m^{2}))) + labs(col = "Heat-Flow") +
   scale_color_gradient(low = "yellow", high = "red") +
   theme(plot.title = element_text(hjust = 0.5, size = 14),
         axis.text.x = element_text(size = 11),
